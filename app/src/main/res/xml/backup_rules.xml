@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- 
+    Specify files to include or exclude from backup.
+    You can include or exclude files by path or domain type.
+    -->
+</full-backup-content>

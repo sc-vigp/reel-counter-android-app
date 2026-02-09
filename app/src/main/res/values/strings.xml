@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Reel Counter</string>
+    <string name="welcome_message">Track Your Reel Usage</string>
+    <string name="total_reels_today">Total Reels Today</string>
+    <string name="add_reel">Add Reel</string>
+    <string name="reset_counter">Reset Counter</string>
+    <string name="statistics">Statistics</string>
+    <string name="settings">Settings</string>
+    <string name="no_data">No data yet. Start tracking!</string>
+    <string name="reels_count">%d reels</string>
+    <string name="usage_time">Usage Time: %s</string>
+    <string name="average_per_day">Average per day</string>
+</resources>
