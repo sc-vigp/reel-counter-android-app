@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.sp
 /**
  * Main screen composable for Reel Counter
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReelCounterScreen(
     todayCount: Int,
