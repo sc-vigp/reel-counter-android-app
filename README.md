@@ -2,15 +2,30 @@
 
 An Android app that tracks the reels you scroll through. Because one hour content creation is not equal to one hour of doom-scrolling.
 
+## 🎉 New Feature: Auto-Detection
+
+The app now **automatically detects** when you open Instagram, Facebook, or WhatsApp and increments the counter without manual input! 
+
+- 🤖 Runs in the background as a foreground service
+- 🔔 Shows a notification when monitoring is active
+- 📱 Detects Instagram, Facebook, and WhatsApp app opens
+- ⏯️ User control to start/stop monitoring
+- 🔒 Respects user privacy with clear permission requests
+
+See [AUTO_DETECTION_FEATURE.md](AUTO_DETECTION_FEATURE.md) for detailed documentation.
+
 ## Overview
 
-Reel Counter is a starter template for an Android application that helps users track their social media reel consumption throughout the day. This template follows Android development best practices and serves as a foundation for building a comprehensive usage tracking app.
+Reel Counter is an Android application that helps users track their social media reel consumption throughout the day. The app follows Android development best practices and features automatic detection of social media app usage.
 
 ## Features
 
 - 📊 **Daily Reel Counter**: Keep track of how many reels you watch each day
-- ➕ **Easy Tracking**: Simple button to increment your reel count
+- 🤖 **Auto-Detection**: Automatically tracks when you open Instagram, Facebook, or WhatsApp
+- 🔔 **Background Monitoring**: Runs as a foreground service with notification
+- ➕ **Manual Tracking**: Option to manually increment counter when not auto-detecting
 - 🔄 **Reset Function**: Reset your daily counter anytime
+- 🔐 **Permission Management**: User-friendly permission request flow
 - 🎨 **Material Design 3**: Modern UI following Material Design guidelines
 - 🏗️ **MVVM Architecture**: Clean architecture pattern for maintainability
 - 🚀 **Jetpack Compose**: Modern declarative UI toolkit
@@ -23,6 +38,9 @@ This app follows the **MVVM (Model-View-ViewModel)** architecture pattern:
 ├── data/
 │   ├── ReelEntry.kt          # Data models
 │   └── ReelRepository.kt     # Data management layer
+├── service/
+│   ├── AppUsageDetector.kt   # App usage detection logic
+│   └── AppUsageMonitorService.kt  # Background monitoring service
 ├── viewmodel/
 │   └── ReelCounterViewModel.kt  # Business logic and UI state
 └── ui/
@@ -175,15 +193,19 @@ data class ReelEntry(
 
 ## Future Enhancements
 
-This is a starter template. Here are features you can add iteratively:
+Here are features you can add iteratively:
 
-### Phase 1: Core Functionality
+### Phase 1: Core Functionality ✅ (Implemented)
+- [x] Automatic app open detection (Instagram, Facebook, WhatsApp)
+- [x] Background monitoring service
+- [x] Permission management UI
 - [ ] Persistent storage with Room database
 - [ ] Time-based tracking (duration)
 - [ ] Daily statistics view
 
 ### Phase 2: Multi-Platform
-- [ ] Track multiple platforms (Instagram, TikTok, YouTube, etc.)
+- [x] Track multiple platforms (Instagram, Facebook, WhatsApp)
+- [ ] Add more platforms (TikTok, YouTube, Twitter, etc.)
 - [ ] Platform selection UI
 - [ ] Platform-specific statistics
 
@@ -191,23 +213,27 @@ This is a starter template. Here are features you can add iteratively:
 - [ ] Weekly/monthly charts and graphs
 - [ ] Usage patterns and insights
 - [ ] Goal setting and tracking
+- [ ] Per-app statistics breakdown
 
 ### Phase 4: Advanced Features
 - [ ] Usage notifications and limits
 - [ ] Dark mode support
 - [ ] Export data (CSV, JSON)
 - [ ] Home screen widget
-- [ ] Background tracking with AccessibilityService
+- [ ] Enhanced tracking with AccessibilityService
+- [ ] Smart reel detection (not just app opens)
 
 ## Permissions
 
-The app requests the following permissions (configured for future features):
+The app uses the following permissions:
 
 - `INTERNET`: For potential cloud sync features
 - `QUERY_ALL_PACKAGES`: To detect social media apps
-- `PACKAGE_USAGE_STATS`: To automatically track app usage
+- `PACKAGE_USAGE_STATS`: **Required** - To automatically track app usage
+- `FOREGROUND_SERVICE`: **Required** - To run background monitoring service
+- `POST_NOTIFICATIONS`: **Required** - To display monitoring notification
 
-**Note**: Current implementation requires manual tracking. Future versions can use these permissions for automatic tracking.
+**Note**: The auto-detection feature requires Usage Access permission, which must be granted manually by the user in system settings. The app provides a guided flow to help users enable this permission.
 
 ## Development Notes
 

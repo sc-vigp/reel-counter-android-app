@@ -17,8 +17,13 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun ReelCounterScreen(
     todayCount: Int,
+    isMonitoring: Boolean,
+    hasUsageStatsPermission: Boolean,
     onAddReel: () -> Unit,
     onResetCounter: () -> Unit,
+    onStartMonitoring: () -> Unit,
+    onStopMonitoring: () -> Unit,
+    onRequestPermission: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -83,17 +88,113 @@ fun ReelCounterScreen(
                 }
             }
             
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             
-            // Add Reel Button
+            // Status Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isMonitoring) 
+                        MaterialTheme.colorScheme.primaryContainer 
+                    else 
+                        MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isMonitoring) "● Monitoring Active" else "○ Monitoring Stopped",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (isMonitoring) 
+                            MaterialTheme.colorScheme.onPrimaryContainer 
+                        else 
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            // Permission warning if needed
+            if (!hasUsageStatsPermission) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "⚠️ Permission Required",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Usage Access permission is required for auto-detection to work",
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = onRequestPermission,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text("Grant Permission")
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+            
+            // Start/Stop Monitoring Button
+            if (hasUsageStatsPermission) {
+                Button(
+                    onClick = if (isMonitoring) onStopMonitoring else onStartMonitoring,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isMonitoring) 
+                            MaterialTheme.colorScheme.error 
+                        else 
+                            MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Text(
+                        text = if (isMonitoring) "⏸ Stop Monitoring" else "▶ Start Monitoring",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Manual Add Button (disabled when monitoring)
             Button(
                 onClick = onAddReel,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
+                    .height(56.dp),
+                enabled = !isMonitoring,
+                colors = ButtonDefaults.buttonColors(
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             ) {
                 Text(
-                    text = "+ Add Reel",
+                    text = if (isMonitoring) "✓ Auto Mode Active" else "+ Add Reel Manually",
                     style = MaterialTheme.typography.titleMedium
                 )
             }
@@ -117,7 +218,10 @@ fun ReelCounterScreen(
             
             // Info Text
             Text(
-                text = "Tap 'Add Reel' each time you watch a reel on social media",
+                text = if (isMonitoring) 
+                    "App is automatically tracking Instagram, Facebook, and WhatsApp opens" 
+                else 
+                    "Start monitoring to automatically count reels when you open social media apps",
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
