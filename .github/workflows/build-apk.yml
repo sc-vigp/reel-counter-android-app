@@ -16,6 +16,9 @@ jobs:
     name: Build APK
     runs-on: ubuntu-latest
     
+    permissions:
+      contents: read  # Required for actions/checkout
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
