@@ -1,5 +1,8 @@
 # Reel Counter Android App
 
+[![Build and Release APK](https://github.com/sc-vigp/reel-counter-android-app/actions/workflows/build-apk.yml/badge.svg)](https://github.com/sc-vigp/reel-counter-android-app/actions/workflows/build-apk.yml)
+[![Create Release](https://github.com/sc-vigp/reel-counter-android-app/actions/workflows/release.yml/badge.svg)](https://github.com/sc-vigp/reel-counter-android-app/actions/workflows/release.yml)
+
 An Android app that tracks the reels you scroll through. Because one hour content creation is not equal to one hour of doom-scrolling.
 
 ## Overview
@@ -114,6 +117,70 @@ settings.gradle.kts            # Project settings
 # Build release APK (unsigned)
 ./gradlew assembleRelease
 ```
+
+## Automated Builds with GitHub Actions
+
+This project includes automated workflows for building and distributing APK files.
+
+### 🔄 Continuous Build Workflow
+
+The **Build and Release APK** workflow runs automatically on:
+- Pushes to `main` or `develop` branches
+- Pull requests to `main` or `develop` branches
+- Manual workflow triggers
+
+**What it does:**
+- Runs unit tests to ensure code quality
+- Builds both debug and release APKs
+- Names APK files with version and commit hash (e.g., `ReelCounter-1.0-debug-abc1234.apk`)
+- Uploads APKs as downloadable artifacts
+- Provides a build summary with version information
+
+**Downloading APKs:**
+1. Go to the [Actions tab](../../actions) in the repository
+2. Click on the latest successful workflow run
+3. Scroll down to the "Artifacts" section
+4. Download the desired APK file
+
+### 🏷️ Release Workflow
+
+The **Create Release** workflow runs when you push a version tag (e.g., `v1.0.0`).
+
+**Creating a release:**
+```bash
+# Create and push a version tag
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+**What it does:**
+- Runs unit tests
+- Builds both debug and release APKs
+- Creates a GitHub Release with the APK files attached
+- Generates release notes automatically
+- Makes APKs directly downloadable from the Releases page
+
+**Downloading from Releases:**
+1. Go to the [Releases page](../../releases)
+2. Find the desired version
+3. Download the APK file from the "Assets" section
+
+### 📦 APK Naming Convention
+
+APK files are named according to the following pattern:
+- **Build workflow**: `ReelCounter-{version}-{type}-{commit}.apk`
+  - Example: `ReelCounter-1.0-release-abc1234.apk`
+- **Release workflow**: `ReelCounter-{version}-{type}.apk`
+  - Example: `ReelCounter-1.0.0-release.apk`
+
+### 🔢 Semantic Versioning
+
+This project follows [Semantic Versioning](https://semver.org/):
+- **MAJOR** version: Incompatible API changes
+- **MINOR** version: New functionality (backwards-compatible)
+- **PATCH** version: Bug fixes (backwards-compatible)
+
+Example: `v1.2.3` = Major.Minor.Patch
 
 ## Code Structure Explained
 

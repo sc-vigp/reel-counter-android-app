@@ -1,0 +1,106 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Triggers on semantic version tags like v1.0.0, v1.2.3, etc.
+
+jobs:
+  release:
+    name: Create Release and Build APK
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write  # Required for creating releases
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+      
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+      
+      - name: Extract version from tag
+        id: get_version
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG#v}
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+      
+      - name: Run unit tests
+        run: ./gradlew test --stacktrace
+      
+      - name: Build release APK
+        run: ./gradlew assembleRelease --stacktrace
+      
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --stacktrace
+      
+      - name: Rename APK files
+        run: |
+          # Rename release APK
+          mv app/build/outputs/apk/release/app-release-unsigned.apk \
+             ReelCounter-${{ steps.get_version.outputs.version }}-release.apk
+          
+          # Rename debug APK
+          mv app/build/outputs/apk/debug/app-debug.apk \
+             ReelCounter-${{ steps.get_version.outputs.version }}-debug.apk
+      
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          ## Reel Counter ${{ steps.get_version.outputs.version }}
+          
+          ### 📱 Download APK
+          
+          Download the APK file below to install on your Android device:
+          
+          - **Release APK**: `ReelCounter-${{ steps.get_version.outputs.version }}-release.apk` (recommended for production use)
+          - **Debug APK**: `ReelCounter-${{ steps.get_version.outputs.version }}-debug.apk` (for development/testing)
+          
+          ### 📋 Installation Instructions
+          
+          1. Download the release APK file
+          2. Enable "Install from Unknown Sources" on your Android device
+          3. Open the downloaded APK file to install
+          4. Launch the Reel Counter app
+          
+          ### ⚠️ Note
+          
+          The release APK is unsigned. You may need to enable installation from unknown sources in your device settings.
+          
+          ### 📝 Changes
+          
+          See the commit history for detailed changes in this release.
+          EOF
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ReelCounter-${{ steps.get_version.outputs.version }}-release.apk
+            ReelCounter-${{ steps.get_version.outputs.version }}-debug.apk
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ReelCounter-${{ steps.get_version.outputs.version }}-artifacts
+          path: |
+            ReelCounter-${{ steps.get_version.outputs.version }}-release.apk
+            ReelCounter-${{ steps.get_version.outputs.version }}-debug.apk
+          retention-days: 365
