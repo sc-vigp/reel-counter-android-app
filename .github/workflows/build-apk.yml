@@ -43,6 +43,7 @@ jobs:
         id: version_info
         run: |
           # Extract version from build.gradle.kts
+          # Note: This expects the format 'versionName = "X.Y"' and 'versionCode = N'
           VERSION_NAME=$(grep "versionName" app/build.gradle.kts | sed 's/.*versionName = "\(.*\)"/\1/')
           VERSION_CODE=$(grep "versionCode" app/build.gradle.kts | sed 's/.*versionCode = \(.*\)/\1/')
           TIMESTAMP=$(date +'%Y%m%d-%H%M%S')
@@ -56,11 +57,12 @@ jobs:
       
       - name: Rename APK files
         run: |
-          # Rename debug APK with version and commit info
+          # Copy APK files with version and commit info (keeping originals for reference)
+          # Debug APK
           cp app/build/outputs/apk/debug/app-debug.apk \
              app/build/outputs/apk/debug/ReelCounter-${{ steps.version_info.outputs.version_name }}-debug-${{ steps.version_info.outputs.commit_short }}.apk
           
-          # Rename release APK with version and commit info
+          # Release APK
           cp app/build/outputs/apk/release/app-release-unsigned.apk \
              app/build/outputs/apk/release/ReelCounter-${{ steps.version_info.outputs.version_name }}-release-${{ steps.version_info.outputs.commit_short }}.apk
       

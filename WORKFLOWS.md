@@ -52,7 +52,7 @@ The workflow produces the following artifacts:
 
 ### Downloading APKs
 
-1. Navigate to the repository's [Actions tab](https://github.com/sc-vigp/reel-counter-android-app/actions)
+1. Navigate to the repository's Actions tab
 2. Click on a successful workflow run
 3. Scroll to the "Artifacts" section at the bottom
 4. Click on the artifact name to download
@@ -104,7 +104,7 @@ Each release includes:
 
 ### Accessing Releases
 
-1. Navigate to the repository's [Releases page](https://github.com/sc-vigp/reel-counter-android-app/releases)
+1. Navigate to the repository's Releases page
 2. Find the desired version
 3. Download APK files from the "Assets" section
 4. Read the release notes for changes and installation instructions
