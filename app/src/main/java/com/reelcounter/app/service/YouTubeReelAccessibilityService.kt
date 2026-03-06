@@ -4,6 +4,11 @@ import android.accessibilityservice.AccessibilityService
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import com.reelcounter.app.data.ReelRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * Accessibility Service to detect YouTube Shorts swipes and auto-track them.
@@ -25,6 +30,9 @@ class YouTubeReelAccessibilityService : AccessibilityService() {
     }
     
     private val repository: ReelRepository = ReelRepository.getInstance()
+    
+    // Coroutine scope for async operations
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     
     // Track last scroll event time for debouncing
     private var lastScrollEventTime: Long = 0
@@ -61,8 +69,8 @@ class YouTubeReelAccessibilityService : AccessibilityService() {
         // Update last scroll time
         lastScrollEventTime = System.currentTimeMillis()
         
-        // Log for debugging
-        Log.d(TAG, "Valid scroll event detected from YouTube")
+        // Process the scroll event
+        processScrollEvent()
     }
     
     /**
@@ -74,6 +82,23 @@ class YouTubeReelAccessibilityService : AccessibilityService() {
         val currentTime = System.currentTimeMillis()
         val timeSinceLastScroll = currentTime - lastScrollEventTime
         return timeSinceLastScroll >= SCROLL_DEBOUNCE_MS
+    }
+    
+    /**
+     * Process a valid scroll event by incrementing the reel counter.
+     * 
+     * Note: In this phase, we count ALL YouTube scrolls.
+     * Phase 3.4 will add Shorts-specific detection to reduce false positives.
+     */
+    private fun processScrollEvent() {
+        serviceScope.launch {
+            try {
+                repository.addReelEntry(platform = "YouTube Shorts")
+                Log.d(TAG, "Reel counted - Total today: ${repository.getTodayCount()}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error counting reel", e)
+            }
+        }
     }
     
     /**
@@ -91,5 +116,6 @@ class YouTubeReelAccessibilityService : AccessibilityService() {
         super.onDestroy()
         Log.d(TAG, "YouTube Reel Accessibility Service destroyed")
         isYouTubeActive = false
+        serviceScope.cancel()
     }
 }
