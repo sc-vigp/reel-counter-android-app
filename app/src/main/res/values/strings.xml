@@ -11,4 +11,7 @@
     <string name="reels_count">%d reels</string>
     <string name="usage_time">Usage Time: %s</string>
     <string name="average_per_day">Average per day</string>
+    
+    <!-- Accessibility Service -->
+    <string name="accessibility_service_description">Automatically track YouTube Shorts you watch. This service monitors your interaction with YouTube to count the number of Shorts you scroll through.</string>
 </resources>
