@@ -26,8 +26,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Initialize ViewModel
-        viewModel = ViewModelProvider(this)[ReelCounterViewModel::class.java]
+        // Initialize ViewModel with application context
+        viewModel = ReelCounterViewModel(context = this)
         
         enableEdgeToEdge()
         
@@ -42,15 +42,26 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    
+    override fun onResume() {
+        super.onResume()
+        // Check accessibility service status when activity resumes
+        // This allows us to detect if user manually enabled/disabled service in Settings
+        viewModel.checkAccessibilityServiceStatus()
+    }
 }
 
 @Composable
 fun ReelCounterApp(viewModel: ReelCounterViewModel) {
     val todayCount by viewModel.todayCount.collectAsState()
+    val isAccessibilityServiceEnabled by viewModel.isAccessibilityServiceEnabled.collectAsState()
     
     ReelCounterScreen(
         todayCount = todayCount,
+        isAccessibilityServiceEnabled = isAccessibilityServiceEnabled,
         onAddReel = { viewModel.addReel() },
-        onResetCounter = { viewModel.resetCounter() }
+        onResetCounter = { viewModel.resetCounter() },
+        onEnableAccessibility = { viewModel.openAccessibilitySettings() },
+        onCheckAccessibilityStatus = { viewModel.checkAccessibilityServiceStatus() }
     )
 }
