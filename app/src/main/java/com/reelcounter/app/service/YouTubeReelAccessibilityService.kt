@@ -6,6 +6,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.reelcounter.app.data.ReelRepository
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -16,6 +17,9 @@ import kotlinx.coroutines.launch
  * 
  * This service monitors accessibility events from the YouTube app and automatically
  * increments the reel counter when a scroll/swipe is detected in the Shorts feed.
+ * 
+ * Robust error handling ensures the service continues operating even if individual
+ * event processing fails.
  */
 class YouTubeReelAccessibilityService : AccessibilityService() {
     
@@ -28,6 +32,9 @@ class YouTubeReelAccessibilityService : AccessibilityService() {
         
         // Enable verbose debug logging
         private const val DEBUG_VERBOSE = false
+        
+        // Maximum consecutive errors before pausing detection
+        private const val MAX_CONSECUTIVE_ERRORS = 10
         
         @Volatile
         var isYouTubeActive = false
@@ -52,13 +59,25 @@ class YouTubeReelAccessibilityService : AccessibilityService() {
         var normalFeedDetected: Int = 0,
         var unknownModeDetected: Int = 0,
         var reelsCounted: Int = 0,
-        var errors: Int = 0
+        var errors: Int = 0,
+        var consecutiveErrors: Int = 0,
+        var detectionPaused: Boolean = false
     )
     
     private val repository: ReelRepository = ReelRepository.getInstance()
     
-    // Coroutine scope for async operations
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    // Exception handler for coroutines - prevents crashes
+    private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        Log.e(TAG, "Uncaught exception in coroutine", throwable)
+        stats.errors++
+        stats.consecutiveErrors++
+        checkErrorThreshold()
+    }
+    
+    // Coroutine scope for async operations with exception handling
+    private val serviceScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Main + exceptionHandler
+    )
     
     // Track last scroll event time for debouncing
     private var lastScrollEventTime: Long = 0
@@ -74,68 +93,86 @@ class YouTubeReelAccessibilityService : AccessibilityService() {
      */
     override fun onServiceConnected() {
         super.onServiceConnected()
-        Log.d(TAG, "YouTube Reel Accessibility Service connected")
-        isYouTubeActive = true
-        
-        // Reset statistics
-        resetStats()
+        try {
+            Log.d(TAG, "YouTube Reel Accessibility Service connected")
+            isYouTubeActive = true
+            resetStats()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in onServiceConnected", e)
+        }
     }
     
     /**
      * Called when an accessibility event is received.
      * 
      * Filters for YouTube scroll events and applies debouncing logic.
+     * All operations are wrapped in try-catch to prevent service crashes.
      */
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event == null) return
-        
-        // Filter: Only process YouTube events
-        if (event.packageName != YOUTUBE_PACKAGE) return
-        
-        // Filter: Only process scroll/swipe events
-        if (event.eventType != AccessibilityEvent.TYPE_VIEW_SCROLLED) {
-            if (DEBUG_VERBOSE) {
-                Log.v(TAG, "Ignoring non-scroll event: ${event.eventType}")
+        try {
+            if (event == null) return
+            
+            // Check if detection is paused due to errors
+            if (stats.detectionPaused) {
+                if (DEBUG_VERBOSE) {
+                    Log.v(TAG, "Detection paused due to excessive errors")
+                }
+                return
             }
-            return
-        }
-        
-        stats.totalScrollEvents++
-        
-        // Debouncing: Check if enough time has passed since last scroll
-        if (!isScrollEventValid()) {
-            stats.debouncedScrolls++
-            if (DEBUG_VERBOSE) {
-                Log.v(TAG, "Scroll event ignored (debouncing) - Total debounced: ${stats.debouncedScrolls}")
+            
+            // Filter: Only process YouTube events
+            if (event.packageName != YOUTUBE_PACKAGE) return
+            
+            // Filter: Only process scroll/swipe events
+            if (event.eventType != AccessibilityEvent.TYPE_VIEW_SCROLLED) {
+                if (DEBUG_VERBOSE) {
+                    Log.v(TAG, "Ignoring non-scroll event: ${event.eventType}")
+                }
+                return
             }
-            return
-        }
-        
-        // Update last scroll time
-        lastScrollEventTime = System.currentTimeMillis()
-        
-        // Check if we're in Shorts section
-        currentViewMode = detectViewMode(event)
-        
-        // Update statistics
-        when (currentViewMode) {
-            ViewMode.SHORTS -> stats.shortsDetected++
-            ViewMode.NORMAL_FEED -> stats.normalFeedDetected++
-            ViewMode.UNKNOWN -> stats.unknownModeDetected++
-        }
-        
-        // Only count if we're in Shorts
-        if (currentViewMode == ViewMode.SHORTS) {
-            processScrollEvent()
-        } else {
-            if (DEBUG_VERBOSE) {
-                Log.v(TAG, "Scroll detected but not in Shorts section (mode: $currentViewMode)")
+            
+            stats.totalScrollEvents++
+            
+            // Debouncing: Check if enough time has passed since last scroll
+            if (!isScrollEventValid()) {
+                stats.debouncedScrolls++
+                if (DEBUG_VERBOSE) {
+                    Log.v(TAG, "Scroll event ignored (debouncing) - Total debounced: ${stats.debouncedScrolls}")
+                }
+                return
             }
-        }
-        
-        // Log statistics periodically (every 10 events)
-        if (stats.totalScrollEvents % 10 == 0) {
-            logStatistics()
+            
+            // Update last scroll time
+            lastScrollEventTime = System.currentTimeMillis()
+            
+            // Check if we're in Shorts section
+            currentViewMode = detectViewMode(event)
+            
+            // Update statistics
+            when (currentViewMode) {
+                ViewMode.SHORTS -> stats.shortsDetected++
+                ViewMode.NORMAL_FEED -> stats.normalFeedDetected++
+                ViewMode.UNKNOWN -> stats.unknownModeDetected++
+            }
+            
+            // Only count if we're in Shorts
+            if (currentViewMode == ViewMode.SHORTS) {
+                processScrollEvent()
+                // Reset consecutive errors on successful operation
+                stats.consecutiveErrors = 0
+            } else {
+                if (DEBUG_VERBOSE) {
+                    Log.v(TAG, "Scroll detected but not in Shorts section (mode: $currentViewMode)")
+                }
+            }
+            
+            // Log statistics periodically (every 10 events)
+            if (stats.totalScrollEvents % 10 == 0) {
+                logStatistics()
+            }
+            
+        } catch (e: Exception) {
+            handleError("Error processing accessibility event", e)
         }
     }
     
@@ -145,9 +182,14 @@ class YouTubeReelAccessibilityService : AccessibilityService() {
      * @return true if enough time has passed since the last scroll event
      */
     private fun isScrollEventValid(): Boolean {
-        val currentTime = System.currentTimeMillis()
-        val timeSinceLastScroll = currentTime - lastScrollEventTime
-        return timeSinceLastScroll >= SCROLL_DEBOUNCE_MS
+        return try {
+            val currentTime = System.currentTimeMillis()
+            val timeSinceLastScroll = currentTime - lastScrollEventTime
+            timeSinceLastScroll >= SCROLL_DEBOUNCE_MS
+        } catch (e: Exception) {
+            handleError("Error validating scroll event", e)
+            false
+        }
     }
     
     /**
@@ -164,8 +206,11 @@ class YouTubeReelAccessibilityService : AccessibilityService() {
      * @return The detected view mode
      */
     private fun detectViewMode(event: AccessibilityEvent): ViewMode {
+        var rootNode: AccessibilityNodeInfo? = null
+        var sourceNode: AccessibilityNodeInfo? = null
+        
         try {
-            val rootNode = rootInActiveWindow
+            rootNode = rootInActiveWindow
             if (rootNode == null) {
                 if (DEBUG_VERBOSE) {
                     Log.v(TAG, "Root node is null, cannot detect view mode")
@@ -182,18 +227,13 @@ class YouTubeReelAccessibilityService : AccessibilityService() {
             }
             
             // Strategy 2: Check the source node's characteristics
-            val sourceNode = event.source
-            if (sourceNode != null) {
-                if (isLikelyShortsScroll(sourceNode)) {
-                    if (DEBUG_VERBOSE) {
-                        Log.v(TAG, "Shorts detected via scroll characteristics")
-                    }
-                    return ViewMode.SHORTS
+            sourceNode = event.source
+            if (sourceNode != null && isLikelyShortsScroll(sourceNode)) {
+                if (DEBUG_VERBOSE) {
+                    Log.v(TAG, "Shorts detected via scroll characteristics")
                 }
-                sourceNode.recycle()
+                return ViewMode.SHORTS
             }
-            
-            rootNode.recycle()
             
             // Default to UNKNOWN if we can't determine
             if (DEBUG_VERBOSE) {
@@ -202,9 +242,16 @@ class YouTubeReelAccessibilityService : AccessibilityService() {
             return ViewMode.UNKNOWN
             
         } catch (e: Exception) {
-            Log.e(TAG, "Error detecting view mode", e)
-            stats.errors++
+            handleError("Error detecting view mode", e)
             return ViewMode.UNKNOWN
+        } finally {
+            // Always recycle nodes to prevent memory leaks
+            try {
+                sourceNode?.recycle()
+                rootNode?.recycle()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error recycling nodes", e)
+            }
         }
     }
     
@@ -243,23 +290,48 @@ class YouTubeReelAccessibilityService : AccessibilityService() {
                 return true
             }
             
-            // Recursively check children
+            // Recursively check children (with depth limit to prevent stack overflow)
+            val maxDepth = 20
+            return checkChildrenForShortsIndicator(node, 0, maxDepth)
+            
+        } catch (e: Exception) {
+            handleError("Error checking Shorts indicator", e)
+            return false
+        }
+    }
+    
+    /**
+     * Recursively check children nodes with depth limiting
+     */
+    private fun checkChildrenForShortsIndicator(
+        node: AccessibilityNodeInfo,
+        currentDepth: Int,
+        maxDepth: Int
+    ): Boolean {
+        if (currentDepth >= maxDepth) return false
+        
+        var child: AccessibilityNodeInfo? = null
+        try {
             for (i in 0 until node.childCount) {
-                val child = node.getChild(i)
+                child = node.getChild(i)
                 if (child != null) {
                     if (containsShortsIndicator(child)) {
-                        child.recycle()
                         return true
                     }
                     child.recycle()
+                    child = null
                 }
             }
-            
             return false
         } catch (e: Exception) {
-            Log.e(TAG, "Error checking Shorts indicator", e)
-            stats.errors++
+            handleError("Error checking child nodes", e)
             return false
+        } finally {
+            try {
+                child?.recycle()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error recycling child node", e)
+            }
         }
     }
     
@@ -307,8 +379,7 @@ class YouTubeReelAccessibilityService : AccessibilityService() {
             
             return false
         } catch (e: Exception) {
-            Log.e(TAG, "Error checking scroll characteristics", e)
-            stats.errors++
+            handleError("Error checking scroll characteristics", e)
             return false
         }
     }
@@ -324,9 +395,29 @@ class YouTubeReelAccessibilityService : AccessibilityService() {
                 val todayCount = repository.getTodayCount()
                 Log.d(TAG, "✅ Reel counted! Total today: $todayCount")
             } catch (e: Exception) {
-                Log.e(TAG, "Error counting reel", e)
-                stats.errors++
+                handleError("Error counting reel", e)
             }
+        }
+    }
+    
+    /**
+     * Centralized error handling
+     */
+    private fun handleError(message: String, e: Exception) {
+        Log.e(TAG, message, e)
+        stats.errors++
+        stats.consecutiveErrors++
+        checkErrorThreshold()
+    }
+    
+    /**
+     * Check if too many consecutive errors have occurred and pause detection if needed
+     */
+    private fun checkErrorThreshold() {
+        if (stats.consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+            stats.detectionPaused = true
+            Log.e(TAG, "⚠️ Detection paused due to $MAX_CONSECUTIVE_ERRORS consecutive errors")
+            Log.e(TAG, "Please restart the accessibility service to resume detection")
         }
     }
     
@@ -334,56 +425,76 @@ class YouTubeReelAccessibilityService : AccessibilityService() {
      * Log current detection statistics
      */
     private fun logStatistics() {
-        val accuracy = if (stats.totalScrollEvents > 0) {
-            (stats.shortsDetected.toFloat() / stats.totalScrollEvents * 100).toInt()
-        } else {
-            0
+        try {
+            val accuracy = if (stats.totalScrollEvents > 0) {
+                (stats.shortsDetected.toFloat() / stats.totalScrollEvents * 100).toInt()
+            } else {
+                0
+            }
+            
+            val statusIndicator = if (stats.detectionPaused) "⚠️ PAUSED" else "✅ ACTIVE"
+            
+            Log.i(TAG, """
+                |📊 Detection Statistics [$statusIndicator]:
+                |  Total scroll events: ${stats.totalScrollEvents}
+                |  Debounced: ${stats.debouncedScrolls}
+                |  Shorts detected: ${stats.shortsDetected}
+                |  Normal feed: ${stats.normalFeedDetected}
+                |  Unknown: ${stats.unknownModeDetected}
+                |  Reels counted: ${stats.reelsCounted}
+                |  Errors: ${stats.errors} (consecutive: ${stats.consecutiveErrors})
+                |  Detection accuracy: $accuracy%
+            """.trimMargin())
+        } catch (e: Exception) {
+            Log.e(TAG, "Error logging statistics", e)
         }
-        
-        Log.i(TAG, """
-            |📊 Detection Statistics:
-            |  Total scroll events: ${stats.totalScrollEvents}
-            |  Debounced: ${stats.debouncedScrolls}
-            |  Shorts detected: ${stats.shortsDetected}
-            |  Normal feed: ${stats.normalFeedDetected}
-            |  Unknown: ${stats.unknownModeDetected}
-            |  Reels counted: ${stats.reelsCounted}
-            |  Errors: ${stats.errors}
-            |  Detection accuracy: $accuracy%
-        """.trimMargin())
     }
     
     /**
      * Reset statistics
      */
     private fun resetStats() {
-        stats.totalScrollEvents = 0
-        stats.debouncedScrolls = 0
-        stats.shortsDetected = 0
-        stats.normalFeedDetected = 0
-        stats.unknownModeDetected = 0
-        stats.reelsCounted = 0
-        stats.errors = 0
-        Log.d(TAG, "Statistics reset")
+        try {
+            stats.totalScrollEvents = 0
+            stats.debouncedScrolls = 0
+            stats.shortsDetected = 0
+            stats.normalFeedDetected = 0
+            stats.unknownModeDetected = 0
+            stats.reelsCounted = 0
+            stats.errors = 0
+            stats.consecutiveErrors = 0
+            stats.detectionPaused = false
+            Log.d(TAG, "Statistics reset")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error resetting statistics", e)
+        }
     }
     
     /**
      * Called when the service is interrupted.
      */
     override fun onInterrupt() {
-        Log.d(TAG, "YouTube Reel Accessibility Service interrupted")
-        logStatistics()
-        isYouTubeActive = false
+        try {
+            Log.d(TAG, "YouTube Reel Accessibility Service interrupted")
+            logStatistics()
+            isYouTubeActive = false
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in onInterrupt", e)
+        }
     }
     
     /**
      * Called when the service is disconnected.
      */
     override fun onDestroy() {
-        super.onDestroy()
-        Log.d(TAG, "YouTube Reel Accessibility Service destroyed")
-        logStatistics()
-        isYouTubeActive = false
-        serviceScope.cancel()
+        try {
+            super.onDestroy()
+            Log.d(TAG, "YouTube Reel Accessibility Service destroyed")
+            logStatistics()
+            isYouTubeActive = false
+            serviceScope.cancel()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in onDestroy", e)
+        }
     }
 }
