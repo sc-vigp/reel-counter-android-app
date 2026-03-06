@@ -17,12 +17,17 @@ class YouTubeReelAccessibilityService : AccessibilityService() {
         private const val TAG = "YouTubeReelAccessibility"
         private const val YOUTUBE_PACKAGE = "com.google.android.youtube"
         
-        // Will be used in Phase 3 & 4 for debouncing and detection
+        // Debouncing: Minimum time between scroll events (milliseconds)
+        private const val SCROLL_DEBOUNCE_MS = 500L
+        
         @Volatile
         var isYouTubeActive = false
     }
     
     private val repository: ReelRepository = ReelRepository.getInstance()
+    
+    // Track last scroll event time for debouncing
+    private var lastScrollEventTime: Long = 0
     
     /**
      * Called when the accessibility service is connected.
@@ -36,17 +41,39 @@ class YouTubeReelAccessibilityService : AccessibilityService() {
     /**
      * Called when an accessibility event is received.
      * 
-     * Phase 1: Just log that we're receiving events.
-     * Phase 3: Implement detection logic.
-     * Phase 4: Refine to only count Shorts.
+     * Filters for YouTube scroll events and applies debouncing logic.
      */
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
         
-        // Phase 1: Only log for now
-        if (event.packageName == YOUTUBE_PACKAGE) {
-            Log.d(TAG, "Event from YouTube: ${event.eventType}")
+        // Filter: Only process YouTube events
+        if (event.packageName != YOUTUBE_PACKAGE) return
+        
+        // Filter: Only process scroll/swipe events
+        if (event.eventType != AccessibilityEvent.TYPE_VIEW_SCROLLED) return
+        
+        // Debouncing: Check if enough time has passed since last scroll
+        if (!isScrollEventValid()) {
+            Log.d(TAG, "Scroll event ignored (debouncing)")
+            return
         }
+        
+        // Update last scroll time
+        lastScrollEventTime = System.currentTimeMillis()
+        
+        // Log for debugging
+        Log.d(TAG, "Valid scroll event detected from YouTube")
+    }
+    
+    /**
+     * Check if the scroll event should be processed based on debouncing logic.
+     * 
+     * @return true if enough time has passed since the last scroll event
+     */
+    private fun isScrollEventValid(): Boolean {
+        val currentTime = System.currentTimeMillis()
+        val timeSinceLastScroll = currentTime - lastScrollEventTime
+        return timeSinceLastScroll >= SCROLL_DEBOUNCE_MS
     }
     
     /**
