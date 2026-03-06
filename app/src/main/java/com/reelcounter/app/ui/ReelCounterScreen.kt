@@ -1,6 +1,8 @@
 package com.reelcounter.app.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -11,20 +13,35 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * Main screen composable for Reel Counter
+ * Main screen composable for Reel Counter with accessibility service onboarding
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReelCounterScreen(
     todayCount: Int,
+    isAccessibilityServiceEnabled: Boolean,
     onAddReel: () -> Unit,
     onResetCounter: () -> Unit,
+    onEnableAccessibility: () -> Unit,
+    onCheckAccessibilityStatus: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Check accessibility status when screen first appears
+    LaunchedEffect(Unit) {
+        onCheckAccessibilityStatus()
+    }
+    
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Reel Counter") },
+                actions = {
+                    // Show status badge in top bar
+                    AccessibilityStatusBadge(
+                        isEnabled = isAccessibilityServiceEnabled,
+                        modifier = Modifier.padding(end = 16.dp)
+                    )
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = MaterialTheme.colorScheme.onPrimary
@@ -36,10 +53,26 @@ fun ReelCounterScreen(
             modifier = modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp),
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Top
         ) {
+            // Accessibility Permission Card (shown at top if not enabled)
+            if (!isAccessibilityServiceEnabled) {
+                AccessibilityPermissionCard(
+                    isEnabled = false,
+                    onEnableClick = onEnableAccessibility
+                )
+            } else {
+                // Show success state
+                AccessibilityPermissionCard(
+                    isEnabled = true,
+                    onEnableClick = { /* No action when already enabled */ }
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
             // Header
             Text(
                 text = "Track Your Reel Usage",
@@ -52,7 +85,9 @@ fun ReelCounterScreen(
             
             // Counter Card
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
                 Column(
@@ -89,7 +124,7 @@ fun ReelCounterScreen(
             Button(
                 onClick = onAddReel,
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .fillMaxWidth(0.9f)
                     .height(56.dp)
             ) {
                 Text(
@@ -104,7 +139,7 @@ fun ReelCounterScreen(
             OutlinedButton(
                 onClick = onResetCounter,
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .fillMaxWidth(0.9f)
                     .height(56.dp)
             ) {
                 Text(
@@ -117,11 +152,18 @@ fun ReelCounterScreen(
             
             // Info Text
             Text(
-                text = "Tap 'Add Reel' each time you watch a reel on social media",
+                text = if (isAccessibilityServiceEnabled) {
+                    "Shorts are being automatically counted in the background."
+                } else {
+                    "Enable accessibility to start automatic tracking."
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp)
             )
+            
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
