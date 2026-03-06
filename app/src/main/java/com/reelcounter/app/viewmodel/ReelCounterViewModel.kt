@@ -1,19 +1,23 @@
 package com.reelcounter.app.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.reelcounter.app.data.DailyStats
 import com.reelcounter.app.data.ReelRepository
+import com.reelcounter.app.service.YouTubeReelAccessibilityService
+import com.reelcounter.app.utils.AccessibilityServiceUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * ViewModel for managing reel counter UI state
+ * ViewModel for managing reel counter UI state and accessibility service status
  */
 class ReelCounterViewModel(
-    private val repository: ReelRepository = ReelRepository.getInstance()
+    private val repository: ReelRepository = ReelRepository.getInstance(),
+    private val context: Context? = null
 ) : ViewModel() {
     
     private val _todayCount = MutableStateFlow(0)
@@ -22,8 +26,12 @@ class ReelCounterViewModel(
     private val _dailyStats = MutableStateFlow<DailyStats?>(null)
     val dailyStats: StateFlow<DailyStats?> = _dailyStats.asStateFlow()
     
+    private val _isAccessibilityServiceEnabled = MutableStateFlow(false)
+    val isAccessibilityServiceEnabled: StateFlow<Boolean> = _isAccessibilityServiceEnabled.asStateFlow()
+    
     init {
         observeReelEntries()
+        checkAccessibilityServiceStatus()
     }
     
     /**
@@ -41,6 +49,27 @@ class ReelCounterViewModel(
                 _dailyStats.value = stats
             }
         }
+    }
+    
+    /**
+     * Check if the Accessibility Service is currently enabled
+     */
+    fun checkAccessibilityServiceStatus() {
+        if (context == null) return
+        
+        val isEnabled = AccessibilityServiceUtils.isAccessibilityServiceEnabled(
+            context,
+            YouTubeReelAccessibilityService::class.java
+        )
+        _isAccessibilityServiceEnabled.value = isEnabled
+    }
+    
+    /**
+     * Open Android Accessibility Settings for the user to enable the service
+     */
+    fun openAccessibilitySettings() {
+        if (context == null) return
+        AccessibilityServiceUtils.openAccessibilitySettings(context)
     }
     
     /**
