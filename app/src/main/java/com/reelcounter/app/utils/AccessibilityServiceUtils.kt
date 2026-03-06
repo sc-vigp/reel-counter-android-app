@@ -1,5 +1,6 @@
 package com.reelcounter.app.utils
 
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
@@ -23,20 +24,35 @@ object AccessibilityServiceUtils {
      * @return true if the service is enabled in accessibility settings, false otherwise
      */
     fun isAccessibilityServiceEnabled(context: Context, serviceClass: Class<*>): Boolean {
-        val serviceName = "${context.packageName}/${serviceClass.canonicalName}"
+        val expectedId = "${context.packageName}/${serviceClass.canonicalName}"
         
         return try {
             val accessibilityManager = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
             val enabledServices = accessibilityManager.getEnabledAccessibilityServiceList(
-                AccessibilityManager.FEEDBACK_GENERIC
+                AccessibilityServiceInfo.FEEDBACK_GENERIC
             )
             
             // Check if our service is in the enabled list
-            enabledServices.any { it.id.contains(serviceName) }
+            // Log for debugging if needed: println("Checking for $expectedId in ${enabledServices.map { it.id }}")
+            enabledServices.any { it.id == expectedId || it.id.contains(expectedId) }
         } catch (e: Exception) {
             // If any error occurs, assume not enabled
             false
         }
+    }
+    
+    /**
+     * Check if the accessibility service is enabled using Settings.Secure.
+     * This is sometimes more reliable than AccessibilityManager.
+     */
+    fun isAccessibilityServiceEnabledSecure(context: Context, serviceClass: Class<*>): Boolean {
+        val expectedId = "${context.packageName}/${serviceClass.canonicalName}"
+        val enabledServices = Settings.Secure.getString(
+            context.contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ) ?: return false
+        
+        return enabledServices.split(':').any { it.equals(expectedId, ignoreCase = true) }
     }
     
     /**

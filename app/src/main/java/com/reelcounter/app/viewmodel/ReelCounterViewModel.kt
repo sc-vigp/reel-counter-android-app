@@ -57,10 +57,16 @@ class ReelCounterViewModel(
     fun checkAccessibilityServiceStatus() {
         if (context == null) return
         
+        // Use both methods to be sure, as AccessibilityManager can sometimes be laggy 
+        // in updating its list right after the user returns from settings.
         val isEnabled = AccessibilityServiceUtils.isAccessibilityServiceEnabled(
             context,
             YouTubeReelAccessibilityService::class.java
+        ) || AccessibilityServiceUtils.isAccessibilityServiceEnabledSecure(
+            context,
+            YouTubeReelAccessibilityService::class.java
         )
+
         _isAccessibilityServiceEnabled.value = isEnabled
     }
     
